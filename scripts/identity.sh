@@ -21,7 +21,7 @@ REPO_URL="https://github.com/$GITHUB_OWNER/$GITHUB_REPO"
 SITE_URL="$REPO_URL"
 FEED_URL="$REPO_URL/releases/latest/download/appcast.xml"
 ZIP_BASE="${APP_NAME// /-}"
-DOWNLOAD_URL="$REPO_URL/releases/latest/download/$ZIP_BASE.zip"
+DOWNLOAD_URL="$REPO_URL/releases/latest/download/$ZIP_BASE.dmg"
 
 identity_fail() { print -u2 -r -- "app.env: $1"; return 1; }
 identity_check() {

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/0-LY/linkway/releases/latest/download/Linkway.zip"><b>Download Linkway for macOS</b></a>
+  <a href="https://github.com/0-LY/linkway/releases/latest/download/Linkway.dmg"><b>Download Linkway for macOS</b></a>
   ·
   <a href="https://github.com/0-LY/linkway/releases">All releases</a>
 </p>
@@ -37,8 +37,8 @@ opens a small picker right where you are, and you choose where it opens.
 
 ## Install
 
-1. [Download Linkway.zip](https://github.com/0-LY/linkway/releases/latest/download/Linkway.zip) and unzip it.
-2. Move **Linkway.app** to your **Applications** folder.
+1. [Download Linkway.dmg](https://github.com/0-LY/linkway/releases/latest/download/Linkway.dmg) and open it.
+2. Drag **Linkway** onto the **Applications** folder in the window that opens.
 3. Open it. Linkway isn't notarized by Apple, so the first time macOS says it can't check it:
    click **Done**, open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
    You only do this once — updates open normally.
