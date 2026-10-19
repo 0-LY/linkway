@@ -2,4 +2,4 @@ build/
 vendor/Sparkle
 dist/
 .DS_Store
-identity.local.env
+app.local.env

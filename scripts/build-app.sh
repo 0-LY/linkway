@@ -2,7 +2,6 @@
 set -euo pipefail
 root="${0:A:h:h}"
 source "$root/scripts/identity.sh"
-source "$root/version.env"
 VERSION="${RELEASE_VERSION:-$VERSION}"
 BUILD="${RELEASE_BUILD:-$BUILD}"
 cd "$root"
@@ -16,11 +15,11 @@ mkdir -p "$out"
 ictool="$HOME/Applications/Icon Composer.app/Contents/Executables/ictool"
 [[ -x "$ictool" ]] || ictool="/Applications/Icon Composer.app/Contents/Executables/ictool"
 if [[ -x "$ictool" ]]; then
-  if [[ ! -f "$out/AppIcon.icns" || Tools/make-icon-doc.py -nt "$out/AppIcon.icns" || Tools/compose-icon.swift -nt "$out/AppIcon.icns" ]]; then
-    python3 -I Tools/make-icon-doc.py "$out/AppIcon.icon" "${APP_ICON:-routes}" >/dev/null
+  if [[ ! -f "$out/AppIcon.icns" || scripts/icon/make-icon-doc.py -nt "$out/AppIcon.icns" || scripts/icon/compose-icon.swift -nt "$out/AppIcon.icns" ]]; then
+    python3 -I scripts/icon/make-icon-doc.py "$out/AppIcon.icon" "${APP_ICON:-routes}" >/dev/null
     "$ictool" "$out/AppIcon.icon" --export-image --output-file "$out/icon-glass.png" \
       --platform macOS --rendition Default --width 824 --height 824 --scale 1 >/dev/null
-    swiftc -O Tools/compose-icon.swift -o "$out/compose-icon"
+    swiftc -O scripts/icon/compose-icon.swift -o "$out/compose-icon"
     "$out/compose-icon" "$out/icon-glass.png" "$out/icon-1024.png"
     rm -rf "$out/AppIcon.iconset"; mkdir -p "$out/AppIcon.iconset"
     for s in 16 32 128 256 512; do
@@ -29,16 +28,16 @@ if [[ -x "$ictool" ]]; then
     done
     iconutil -c icns "$out/AppIcon.iconset" -o "$out/AppIcon.icns"
   fi
-elif [[ ! -f "$out/AppIcon.icns" || Tools/make-icon.swift -nt "$out/AppIcon.icns" ]]; then
+elif [[ ! -f "$out/AppIcon.icns" || scripts/icon/make-icon.swift -nt "$out/AppIcon.icns" ]]; then
   rm -rf "$out/AppIcon.iconset"
-  swiftc -O Tools/make-icon.swift -o "$out/make-icon"
+  swiftc -O scripts/icon/make-icon.swift -o "$out/make-icon"
   "$out/make-icon" "$out/AppIcon.iconset"
   iconutil -c icns "$out/AppIcon.iconset" -o "$out/AppIcon.icns"
 fi
 
 rm -rf "$out"/*.app(N)
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks"
-cp Info.plist "$app/Contents/Info.plist"
+cp Resources/Info.plist "$app/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$app/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD" "$app/Contents/Info.plist"
 plist="$app/Contents/Info.plist"
@@ -70,6 +69,6 @@ fw="$app/Contents/Frameworks/Sparkle.framework/Versions/B"
 sign "$fw/Autoupdate"
 sign "$fw/Updater.app"
 sign "$app/Contents/Frameworks/Sparkle.framework"
-sign --entitlements "$root/Linkway.entitlements" "$app"
+sign --entitlements "$root/Resources/Linkway.entitlements" "$app"
 codesign --verify --deep --strict "$app"
 print -r -- "$app"

@@ -1,7 +1,7 @@
 identity_root="${${(%):-%x}:A:h:h}"
-unset APP_NAME EXECUTABLE BUNDLE_ID PUBLISHER GITHUB_OWNER GITHUB_REPO CONFIG_DIR_NAME SPARKLE_ACCOUNT SPARKLE_PUBLIC_KEY SIGN_IDENTITY
-source "$identity_root/identity.env"
-identity_local="$identity_root/identity.local.env"
+unset APP_NAME EXECUTABLE BUNDLE_ID PUBLISHER GITHUB_OWNER GITHUB_REPO CONFIG_DIR_NAME SPARKLE_ACCOUNT SPARKLE_PUBLIC_KEY SIGN_IDENTITY VERSION BUILD
+source "$identity_root/app.env"
+identity_local="$identity_root/app.local.env"
 if [[ -f "$identity_local" ]]; then
   if [[ "${IDENTITY_RELEASE:-0}" == 1 ]]; then
     SPARKLE_HOME="$(zsh -fc 'source "$1"; print -r -- "${SPARKLE_HOME:-}"' _ "$identity_local")"
@@ -23,7 +23,7 @@ FEED_URL="$REPO_URL/releases/latest/download/appcast.xml"
 ZIP_BASE="${APP_NAME// /-}"
 DOWNLOAD_URL="$REPO_URL/releases/latest/download/$ZIP_BASE.zip"
 
-identity_fail() { print -u2 -r -- "identity.env: $1"; return 1; }
+identity_fail() { print -u2 -r -- "app.env: $1"; return 1; }
 identity_check() {
   [[ "$APP_NAME" =~ '^[A-Za-z0-9][A-Za-z0-9 ._-]*$' ]] || identity_fail "APP_NAME '$APP_NAME' may use letters, digits, space, . _ -" || return 1
   [[ "$EXECUTABLE" =~ '^[A-Za-z0-9._-]+$' ]] || identity_fail "EXECUTABLE '$EXECUTABLE' may use letters, digits, . _ -" || return 1

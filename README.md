@@ -85,9 +85,9 @@ You need the Xcode Command Line Tools (`xcode-select --install`). The first buil
 | `Sources/Settings.swift` | Settings window |
 | `Sources/Updates.swift` | Automatic updates (Sparkle) |
 | `Sources/Identity.swift` | Name, bundle ID and settings folder, read from the built app |
-| `identity.env` | Public identity: name, publisher, GitHub owner and repo |
-| `Tools/` | App icon |
-| `scripts/` | Build, release and Sparkle download scripts |
+| `Resources/` | Info.plist template and entitlements |
+| `app.env` | Name, publisher, GitHub owner and repo, version |
+| `scripts/` | Build and Sparkle download scripts; `scripts/icon/` makes the app icon |
 
 ## Credits
 
