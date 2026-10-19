@@ -9,6 +9,7 @@ final class SettingsModel: ObservableObject {
     @Published var cfg: Config
     @Published var editing: UUID?
     @Published var dropTarget: UUID?
+    @Published var historyCount = 0
     var dragging: UUID?
     @Published var isDefault = false
     @Published var profilesBlocked = false
@@ -157,7 +158,7 @@ struct SettingsView: View {
                 .padding(.bottom, 12)
         }
         .controlSize(.small)
-        .frame(width: 480, height: 520)
+        .frame(width: 480, height: 580)
     }
 
     private var appsTab: some View {
@@ -229,11 +230,17 @@ struct SettingsView: View {
                 }
             }
             Section {
-                LabeledContent("Config file") {
-                    Button("Show in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([Config.fileURL])
+                LabeledContent {
+                    Button("Clear") {
+                        History.clear()
+                        m.historyCount = 0
                     }
+                    .disabled(m.historyCount == 0)
+                } label: {
+                    Text("Remembered sites")
+                    Text(m.historyCount == 1 ? "1 site" : "\(m.historyCount) sites")
                 }
+                .onAppear { m.historyCount = History.count }
                 LabeledContent("Quit \(Identity.appName)") {
                     Button("Quit") { NSApp.terminate(nil) }
                 }
@@ -644,7 +651,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             for (id, title, symbol) in SettingsTabs.panes {
                 let host = NSHostingController(rootView: SettingsView(m: model, tab: id))
                 host.sizingOptions = [.preferredContentSize]
-                host.title = title
+                host.title = "\(Identity.appName) — \(title)"
                 let item = NSTabViewItem(viewController: host)
                 item.label = title
                 item.identifier = id

@@ -200,6 +200,12 @@ enum History {
         guard let k = key(url) else { return }
         store[k] = targetId
     }
+
+    static var count: Int { store.count }
+
+    static func clear() {
+        store = [:]
+    }
 }
 
 @MainActor

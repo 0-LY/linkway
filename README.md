@@ -89,18 +89,6 @@ You need the Xcode Command Line Tools (`xcode-select --install`). The first buil
 | `Tools/` | App icon |
 | `scripts/` | Build, release and Sparkle download scripts |
 
-## Rename or rebrand
-
-Everything public — app name, bundle ID, publisher, GitHub owner and repo, update feed and settings folder — comes from `identity.env`.
-
-1. Edit `identity.env`.
-2. Run `scripts/rename.sh`. It regenerates this README, `LICENSE` and `SECURITY.md` from `templates/`, then rebuilds and reinstalls the app and copies your settings to the new folder.
-3. Before the first release, create the signing certificate once with `scripts/make-cert.sh`.
-
-Rename only before the first public release. Afterwards, changing `BUNDLE_ID`, `GITHUB_OWNER` or `GITHUB_REPO` cuts installed copies off from updates.
-
-An uncommitted `identity.local.env` can override any value for builds on your own Mac. Releases ignore it.
-
 ## Credits
 
 Updates: [Sparkle](https://sparkle-project.org) (MIT).
