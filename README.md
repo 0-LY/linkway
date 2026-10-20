@@ -38,11 +38,15 @@ opens a small picker right where you are, and you choose where it opens.
 
 ## Install
 
-1. [Download Linkway.dmg](https://github.com/0-LY/linkway/releases/latest/download/Linkway.dmg) and open it.
+> [!IMPORTANT]
+> **First install only.** Linkway isn't notarized by Apple, so macOS blocks it the first time.
+> You may see this twice — once for the `.dmg`, once for the app. Each time: click **Done**, open
+> **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to "Linkway",
+> then open it again. You do this once per app; updates install and open normally.
+
+1. [Download Linkway.dmg](https://github.com/0-LY/linkway/releases/latest/download/Linkway.dmg) and open it. If macOS blocks it, use **Open Anyway** as above.
 2. Drag **Linkway** onto the **Applications** folder in the window that opens.
-3. Open it. Linkway isn't notarized by Apple, so the first time macOS says it can't check it:
-   click **Done**, open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
-   You only do this once — updates open normally.
+3. Open Linkway from Applications. If macOS blocks it, use **Open Anyway** again.
 4. In Linkway's settings click **Make Default** and confirm.
    To start it with your Mac, turn on **Open at login** in Settings → General.
 5. Optional: to list browser profiles separately, allow **Full Disk Access**
