@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/picker.png" width="420" alt="The Linkway picker">
+  <img src="docs/screenshots/in-use.png" width="560" alt="The Linkway picker">
 </p>
 
 ## What it does
@@ -31,8 +31,9 @@ opens a small picker right where you are, and you choose where it opens.
 - Add, remove, reorder, rename and hide apps, set shortcut letters, picker size and position.
 
 <p align="center">
-  <img src="docs/screenshots/apps.png" width="300" alt="Apps settings">
-  <img src="docs/screenshots/general.png" width="300" alt="General settings">
+  <img src="docs/screenshots/settings-apps.png" width="360" alt="Apps settings">
+  <img src="docs/screenshots/settings-picker.png" width="360" alt="Picker settings">
+  <img src="docs/screenshots/settings-general.png" width="360" alt="General settings">
 </p>
 
 ## Install
@@ -43,6 +44,7 @@ opens a small picker right where you are, and you choose where it opens.
    click **Done**, open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
    You only do this once — updates open normally.
 4. In Linkway's settings click **Make Default** and confirm.
+   To start it with your Mac, turn on **Open at login** in Settings → General.
 5. Optional: to list browser profiles separately, allow **Full Disk Access**
    (System Settings → Privacy & Security → Full Disk Access). Linkway only reads the browsers' profile lists.
 

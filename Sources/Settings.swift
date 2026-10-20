@@ -67,6 +67,11 @@ final class SettingsModel: ObservableObject {
 
     private var watcher: Timer?
 
+    func stopWatching() {
+        watcher?.invalidate()
+        watcher = nil
+    }
+
     func watchAccess() {
         guard watcher == nil, profilesBlocked else { return }
         watcher = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
@@ -385,7 +390,7 @@ private struct Step: View {
                 .font(.system(size: 9, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .frame(width: 15, height: 15)
-                .background(Color.accentColor, in: Circle())
+                .background(Color(nsColor: .controlAccentColor), in: Circle())
             Text(text)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -480,7 +485,7 @@ private struct AppRow: View {
         .padding(.vertical, 1)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { m.editing = id }
-        .background(m.dropTarget == id && m.dragging != id ? Color.accentColor.opacity(0.18) : .clear,
+        .background(m.dropTarget == id && m.dragging != id ? Color(nsColor: .controlAccentColor).opacity(0.18) : .clear,
                     in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .onDrag {
             m.dragging = id
@@ -629,6 +634,12 @@ private struct AppEditor: View {
     }
 }
 
+final class QuietWindow: NSWindow {
+    override func noResponder(for eventSelector: Selector) {}
+
+    override func cancelOperation(_ sender: Any?) { performClose(sender) }
+}
+
 @MainActor
 final class SettingsWindow: NSObject, NSWindowDelegate {
     private let model = SettingsModel()
@@ -640,6 +651,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     var isVisible: Bool { window?.isVisible == true }
+
+    func windowWillClose(_ notification: Notification) {
+        model.stopWatching()
+    }
 
     func show() {
         model.cfg = Config.load()
@@ -658,7 +673,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
                 item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)
                 tabs.addTabViewItem(item)
             }
-            let w = NSWindow(contentViewController: tabs)
+            let w = QuietWindow(contentViewController: tabs)
             let start = CommandLine.arguments.first { $0.hasPrefix("--tab=") }.map { String($0.dropFirst(6)) }
                 ?? UserDefaults.standard.string(forKey: SettingsTabs.lastKey) ?? "apps"
             tabs.selectedTabViewItemIndex = SettingsTabs.panes.firstIndex { $0.0 == start } ?? 0

@@ -19,6 +19,13 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
     private var cameFromElsewhere = false
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        let me = ProcessInfo.processInfo.processIdentifier
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "")
+            .filter { $0.processIdentifier != me && !$0.isTerminated }
+        if let other = others.first {
+            other.activate()
+            exit(0)
+        }
         launchedAtLogin = Self.isLoginLaunch()
     }
 
@@ -161,8 +168,14 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
             return i
         }
         submenu(Identity.appName, [
+            item("About \(Identity.appName)", #selector(NSApplication.orderFrontStandardAboutPanel(_:)), ""),
+            .separator(),
             item("Settings…", #selector(openSettings), ",", target: self),
             item("Check for Updates…", #selector(checkUpdates), "", target: self),
+            .separator(),
+            item("Hide \(Identity.appName)", #selector(NSApplication.hide(_:)), "h"),
+            item("Hide Others", #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]),
+            item("Show All", #selector(NSApplication.unhideAllApplications(_:)), ""),
             .separator(),
             item("Quit \(Identity.appName)", #selector(NSApplication.terminate(_:)), "q"),
         ])
@@ -178,6 +191,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         submenu("Window", [
             item("Close", #selector(NSWindow.performClose(_:)), "w"),
             item("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m"),
+            .separator(),
+            item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:)), ""),
         ])
         return main
     }

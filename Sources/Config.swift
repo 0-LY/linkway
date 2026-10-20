@@ -42,15 +42,21 @@ struct Config: Codable, Equatable {
         (try? FileManager.default.attributesOfItem(atPath: fileURL.path))?[.modificationDate] as? Date
     }
 
+    nonisolated(unsafe) private static var cached: (stamp: Date?, cfg: Config)?
+
     static func load() -> Config {
+        let stamp = modified
+        if let c = cached, stamp != nil, c.stamp == stamp { return c.cfg }
         if let data = try? Data(contentsOf: fileURL),
            let cfg = try? JSONDecoder().decode(Config.self, from: data) {
             lockDirectory()
             protect(fileURL)
             protect(fileURL.deletingLastPathComponent().appendingPathComponent("history.json"))
+            cached = (stamp, cfg)
             return cfg
         }
-        let cfg = Config(apps: defaultApps)
+        var cfg = Config(apps: defaultApps)
+        if !FileManager.default.fileExists(atPath: fileURL.path) { cfg.launchAtLogin = false }
         if FileManager.default.fileExists(atPath: fileURL.path) {
             let backup = fileURL.deletingLastPathComponent().appendingPathComponent("config.unreadable.json")
             if !FileManager.default.fileExists(atPath: backup.path) {
@@ -68,6 +74,7 @@ struct Config: Codable, Equatable {
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try? enc.encode(cfg).write(to: fileURL, options: .atomic)
         protect(fileURL)
+        cached = (modified, cfg)
     }
 
     static func lockDirectory() {

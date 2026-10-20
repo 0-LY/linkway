@@ -201,8 +201,8 @@ private struct Tile: View {
         .background {
             if selected {
                 RoundedRectangle(cornerRadius: mt.tileRadius, style: .continuous)
-                    .fill(Color.accentColor.gradient)
-                    .shadow(color: Color.accentColor.opacity(0.35), radius: 4, y: 2)
+                    .fill(Color(nsColor: .controlAccentColor).gradient)
+                    .shadow(color: Color(nsColor: .controlAccentColor).opacity(0.35), radius: 4, y: 2)
             }
         }
         .overlay {
@@ -223,9 +223,9 @@ private struct Tile: View {
             if recommended {
                 Image(systemName: "sparkle")
                     .font(.system(size: mt.small - 2, weight: .bold))
-                    .foregroundStyle(selected ? Color.accentColor : .white)
+                    .foregroundStyle(selected ? Color(nsColor: .controlAccentColor) : .white)
                     .frame(width: badgeSize, height: badgeSize)
-                    .background(selected ? AnyShapeStyle(Color.white) : AnyShapeStyle(Color.accentColor.gradient), in: Circle())
+                    .background(selected ? AnyShapeStyle(Color.white) : AnyShapeStyle(Color(nsColor: .controlAccentColor).gradient), in: Circle())
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.6), lineWidth: 0.75))
                     .padding(.top, inset)
                     .padding(.trailing, inset)
