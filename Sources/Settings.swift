@@ -90,6 +90,8 @@ final class SettingsModel: ObservableObject {
         preview.lastUsed = nil
         preview.selected = rec ?? 0
         preview.size = cfg.pickerSize ?? 0
+        preview.canRemember = cfg.mode == .direct
+        if !preview.canRemember { preview.remember = false }
     }
 
     func refresh() {
