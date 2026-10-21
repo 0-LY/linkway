@@ -46,8 +46,9 @@ opens a small picker right where you are, and you choose where it opens.
 1. [Download Linkway.dmg](https://github.com/0-LY/linkway/releases/latest/download/Linkway.dmg) and open it.
 2. Drag **Linkway** onto the **Applications** folder in the window that opens.
 3. Open Linkway from Applications and use **Open Anyway** as above.
-4. **First launch:** a short setup lets you pick your apps (only apps on this Mac are listed), make Linkway
-   your default browser, and optionally allow **Full Disk Access** to list browser profiles separately.
+4. **First launch:** a short three-step setup lets you pick your apps (only apps on this Mac are listed), make Linkway
+   your default browser, and optionally allow **Full Disk Access** to list browser profiles separately —
+   with a little confetti when you're done.
    Run it again any time from the menu: **Set Up Linkway…**
    To start it with your Mac, turn on **Open at login** in Settings → General.
 
