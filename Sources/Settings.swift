@@ -310,6 +310,7 @@ struct SettingsView: View {
                     }
                 }
                 .probe("match")
+                if m.cfg.mode == .direct {
                 LabeledContent {
                     HStack(spacing: 6) {
                         Button("Manage…") { m.reloadRemembered(); m.showManage = true }
@@ -323,18 +324,13 @@ struct SettingsView: View {
                 }
                 .probe("remembered")
                 .onAppear { m.reloadRemembered() }
-            } footer: {
-                Text("In the picker, ⇧↩ or “Remember for this site” saves your choice.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
-                LabeledContent {
-                    ShortcutRecorder(shortcut: m.shortcut)
-                } label: {
-                    Text("Open copied link")
-                    Text("Shows the picker for the link on the clipboard.")
+                .transition(.opacity)
                 }
-                .probe("shortcut")
+            } footer: {
+                if m.cfg.mode == .direct {
+                    Text("In the picker, ⇧↩ or “Remember for this site” saves your choice.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)

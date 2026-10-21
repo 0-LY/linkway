@@ -58,7 +58,6 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         let args = CommandLine.arguments
         if args.contains("--make-default") { DefaultBrowser.make() }
         model.onPick = { [weak self] i, action in self?.open(index: i, action: action) }
-        GlobalHotKey.shared.onPress = { [weak self] in self?.openCopiedLink() }
         if !DefaultBrowser.isDefault { DefaultBrowser.rememberPrevious() }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -127,15 +126,6 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         keepSettingsBehind()
     }
 
-    private func openCopiedLink() {
-        guard let url = Router.clipboardURL(NSPasteboard.general.string(forType: .string)) else {
-            Toast.shared.show("No link on the clipboard")
-            return
-        }
-        let userWasHere = NSApp.isActive && Date().timeIntervalSince(activatedAt) > 1
-        present([url], fromElsewhere: !userWasHere)
-    }
-
     func applicationDidBecomeActive(_ notification: Notification) {
         keepSettingsBehind()
     }
@@ -171,7 +161,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
     }
 
     private func applyShortcut(_ cfg: Config) {
-        GlobalHotKey.shared.register(cfg.copiedLinkShortcut.flatMap(RecordedShortcut.init(storageID:)))
+        GlobalHotKey.shared.register(nil)
     }
 
     private func applyGeneral() {
@@ -302,6 +292,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
             recommended = list.firstIndex { KnownApps.matches(host, $0.domains) }
         }
         model.size = cfg.pickerSize ?? 0
+        model.canRemember = cfg.mode == .direct
+        if !model.canRemember { model.remember = false }
         model.urls = urls
         model.targets = list
         let remembered = Remembered.choice(for: urls.first).flatMap { id in list.firstIndex { $0.id == id } }
@@ -358,7 +350,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         let t = shown[index]
         hide(returnFocus: action.background)
         History.record(urls.first, t.id)
-        if action.remember { Remembered.set(urls.first, t.id) }
+        if action.remember && model.canRemember { Remembered.set(urls.first, t.id) }
         Catalog.open(urls, with: t, background: action.background)
     }
 

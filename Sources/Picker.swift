@@ -46,6 +46,7 @@ final class PickerModel: ObservableObject {
     @Published var recommended: Int?
     @Published var size = 0
     @Published var remember = false
+    @Published var canRemember = true
     var origin: NSPoint = .zero
     var onPick: (Int, PickAction) -> Void = { _, _ in }
 
@@ -125,6 +126,7 @@ struct PickerView: View {
             if model.current != nil {
                 KeyCap("↩", size: mt.small - 1)
                 Text("Open")
+                if model.canRemember {
                 Spacer().frame(width: mt.pad)
                 Button {
                     model.remember.toggle()
@@ -138,6 +140,7 @@ struct PickerView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Open it there automatically next time · ⇧↩ or R")
+                }
             }
         }
         .font(.system(size: mt.small, weight: .medium))

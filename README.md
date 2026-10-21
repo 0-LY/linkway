@@ -34,7 +34,6 @@ opens straight away in the right app, with no extra step:
   **⇧↩** (or "Remember for this site") opens it and remembers the choice for that site.
   ⌘↩ opens in the background, ⌘C copies the link, esc cancels.
 - Prefer choosing every time? Settings → Links → **When I click a link: Always ask**.
-- Optional shortcut **Open copied link** shows the picker for the link on your clipboard.
 - Chrome-family and Firefox profiles show up as separate choices.
 - Add, remove, reorder, rename and hide apps, set shortcut letters, picker size and position.
 - Apps that ask "Open in Linkway" mean your default browser — Linkway passes the link on.
