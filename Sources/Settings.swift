@@ -140,8 +140,8 @@ final class SettingsModel: ObservableObject {
         var seen = Set<String>()
         return NSWorkspace.shared.urlsForApplications(toOpen: URL(string: "https://example.com")!)
             .filter { url in
-                guard let id = Bundle(url: url)?.bundleIdentifier, id != me,
-                      id != "com.browserosaurus", !seen.contains(id) else { return false }
+                guard let id = Bundle(url: url)?.bundleIdentifier, id != me, FirstRun.isBrowser(id),
+                      !seen.contains(id) else { return false }
                 seen.insert(id)
                 return true
             }
@@ -366,8 +366,8 @@ private struct ProfilesNotice: View {
             Text("To show each Chrome or Firefox profile as its own choice, allow \(Identity.appName) Full Disk Access once.")
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 4) {
-                Step(n: 1, text: "Click the button below. It copies “Full Disk Access” and opens System Settings.")
-                Step(n: 2, text: "Click the search field at the top left, paste (⌘V), and open Full Disk Access.")
+                Step(n: 1, text: "Click the button below. It opens System Settings → Full Disk Access.")
+                Step(n: 2, text: "If it opens elsewhere, click the search field and paste (⌘V): the button copied “Full Disk Access”.")
                 Step(n: 3, text: "Turn on \(Identity.appName) (or click + and choose \(Identity.appName)), then Quit & Reopen.")
             }
             HStack {
@@ -408,9 +408,12 @@ private struct Step: View {
 enum Access {
     private static let settingsID = "com.apple.systempreferences"
 
+    static let fullDiskAccessURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
+
     static func openFullDiskAccess() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString("Full Disk Access", forType: .string)
+        if NSWorkspace.shared.open(fullDiskAccessURL) { return }
         if let running = NSRunningApplication.runningApplications(withBundleIdentifier: settingsID).first {
             running.activate()
             return

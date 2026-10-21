@@ -46,16 +46,18 @@ opens a small picker right where you are, and you choose where it opens.
 1. [Download Linkway.dmg](https://github.com/0-LY/linkway/releases/latest/download/Linkway.dmg) and open it.
 2. Drag **Linkway** onto the **Applications** folder in the window that opens.
 3. Open Linkway from Applications and use **Open Anyway** as above.
-4. **First launch:** a short three-step setup lets you pick your apps (only apps on this Mac are listed), make Linkway
-   your default browser, and optionally allow **Full Disk Access** to list browser profiles separately —
-   with a little confetti when you're done.
+4. **First launch:** a short setup welcomes you, lets you pick your apps (your browsers and apps that
+   open links; search to add any other app), make Linkway your default browser, and optionally allow
+   **Full Disk Access** to list browser profiles separately — the button opens that page in System Settings
+   directly. A little confetti when you're done.
    Run it again any time from the menu: **Set Up Linkway…**
    To start it with your Mac, turn on **Open at login** in Settings → General.
 
 <p align="center">
-  <img src="docs/screenshots/setup-apps.png" width="260" alt="Setup: choose your apps">
-  <img src="docs/screenshots/setup-default.png" width="260" alt="Setup: default browser">
-  <img src="docs/screenshots/setup-profiles.png" width="260" alt="Setup: browser profiles">
+  <img src="docs/screenshots/setup-welcome.png" width="200" alt="Setup: welcome">
+  <img src="docs/screenshots/setup-apps.png" width="200" alt="Setup: choose your apps">
+  <img src="docs/screenshots/setup-default.png" width="200" alt="Setup: default browser">
+  <img src="docs/screenshots/setup-profiles.png" width="200" alt="Setup: browser profiles">
 </p>
 
 Requirements: macOS 26 or later on Apple silicon.
