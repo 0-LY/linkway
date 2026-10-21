@@ -39,18 +39,23 @@ opens a small picker right where you are, and you choose where it opens.
 ## Install
 
 > [!IMPORTANT]
-> **First install only.** Linkway isn't notarized by Apple, so macOS blocks it the first time.
-> You may see this twice — once for the `.dmg`, once for the app. Each time: click **Done**, open
-> **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to "Linkway",
-> then open it again. You do this once per app; updates install and open normally.
+> **First launch only.** Linkway isn't notarized by Apple, so macOS blocks it the first time you open it.
+> Click **Done**, open **System Settings → Privacy & Security**, scroll down, click **Open Anyway**
+> next to "Linkway", then open it again. You do this once; updates install and open normally.
 
-1. [Download Linkway.dmg](https://github.com/0-LY/linkway/releases/latest/download/Linkway.dmg) and open it. If macOS blocks it, use **Open Anyway** as above.
+1. [Download Linkway.dmg](https://github.com/0-LY/linkway/releases/latest/download/Linkway.dmg) and open it.
 2. Drag **Linkway** onto the **Applications** folder in the window that opens.
-3. Open Linkway from Applications. If macOS blocks it, use **Open Anyway** again.
-4. In Linkway's settings click **Make Default** and confirm.
+3. Open Linkway from Applications and use **Open Anyway** as above.
+4. **First launch:** a short setup lets you pick your apps (only apps on this Mac are listed), make Linkway
+   your default browser, and optionally allow **Full Disk Access** to list browser profiles separately.
+   Run it again any time from the menu: **Set Up Linkway…**
    To start it with your Mac, turn on **Open at login** in Settings → General.
-5. Optional: to list browser profiles separately, allow **Full Disk Access**
-   (System Settings → Privacy & Security → Full Disk Access). Linkway only reads the browsers' profile lists.
+
+<p align="center">
+  <img src="docs/screenshots/setup-apps.png" width="260" alt="Setup: choose your apps">
+  <img src="docs/screenshots/setup-default.png" width="260" alt="Setup: default browser">
+  <img src="docs/screenshots/setup-profiles.png" width="260" alt="Setup: browser profiles">
+</p>
 
 Requirements: macOS 26 or later on Apple silicon.
 

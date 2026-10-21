@@ -17,6 +17,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
     private var activatedAt = Date.distantPast
     private var shownAt = Date.distantPast
     private var cameFromElsewhere = false
+    private var configExisted = true
+    private lazy var setup: SetupWindow = {
+        let w = SetupWindow()
+        w.onFinish = { [weak self] in self?.configChanged() }
+        return w
+    }()
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         let me = ProcessInfo.processInfo.processIdentifier
@@ -27,6 +33,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
             exit(0)
         }
         launchedAtLogin = Self.isLoginLaunch()
+        configExisted = Config.exists
     }
 
     private static func isLoginLaunch() -> Bool {
@@ -59,9 +66,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         _ = panel
         host.layoutSubtreeIfNeeded()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-            guard let self, !self.gotURL, !self.launchedAtLogin,
-                  !args.contains("--background"), !args.contains("--make-default") else { return }
-            self.settings.show()
+            guard let self, !self.gotURL, !args.contains("--background"), !args.contains("--make-default") else { return }
+            if FirstRun.shouldOfferSetup(configExisted: self.configExisted) {
+                self.setup.show()
+            } else if !self.launchedAtLogin {
+                self.settings.show()
+            }
         }
     }
 
@@ -124,6 +134,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
                                              accessibilityDescription: Identity.appName)
                 let menu = NSMenu()
                 menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+                menu.addItem(withTitle: "Set Up \(Identity.appName)…", action: #selector(openSetup), keyEquivalent: "").target = self
                 menu.addItem(withTitle: "Check for Updates…", action: #selector(checkUpdates), keyEquivalent: "").target = self
                 let def = menu.addItem(withTitle: "Make Default Browser", action: #selector(makeDefault), keyEquivalent: "")
                 def.target = self
@@ -171,6 +182,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
             item("About \(Identity.appName)", #selector(NSApplication.orderFrontStandardAboutPanel(_:)), ""),
             .separator(),
             item("Settings…", #selector(openSettings), ",", target: self),
+            item("Set Up \(Identity.appName)…", #selector(openSetup), "", target: self),
             item("Check for Updates…", #selector(checkUpdates), "", target: self),
             .separator(),
             item("Hide \(Identity.appName)", #selector(NSApplication.hide(_:)), "h"),
@@ -198,6 +210,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
     }
 
     @objc private func openSettings() { settings.show() }
+    @objc private func openSetup() { setup.show() }
     @objc private func checkUpdates() { Updates.shared.checkNow() }
     @objc private func makeDefault() { DefaultBrowser.make() }
     @objc private func quit() { NSApp.terminate(nil) }

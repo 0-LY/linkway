@@ -106,11 +106,16 @@ final class SettingsModel: ObservableObject {
         if editing == id { editing = nil }
     }
 
+    var visibleApps: [AppEntry] {
+        Config.visibleApps(cfg.apps, installed: { AppInfo.lookup($0).installed })
+    }
+
     func move(_ id: UUID, by delta: Int) {
-        guard let i = index(id) else { return }
-        let j = min(max(i + delta, 0), cfg.apps.count - 1)
-        guard i != j else { return }
-        cfg.apps.insert(cfg.apps.remove(at: i), at: j)
+        let shown = visibleApps.map(\.id)
+        guard let i = shown.firstIndex(of: id) else { return }
+        let j = i + delta
+        guard j >= 0, j < shown.count, let a = index(id), let b = index(shown[j]) else { return }
+        cfg.apps.swapAt(a, b)
     }
 
     func move(_ id: UUID, before target: UUID) {
@@ -169,7 +174,7 @@ struct SettingsView: View {
     private var appsTab: some View {
         Form {
             Section {
-                ForEach(m.cfg.apps) { e in
+                ForEach(m.visibleApps) { e in
                     AppRow(entry: m.binding(e.id), m: m)
                 }
 

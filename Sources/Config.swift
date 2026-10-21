@@ -33,6 +33,21 @@ struct Config: Codable, Equatable {
         .init(bundleId: "org.mozilla.firefox", key: "f"),
     ]
 
+    static func installedDefaults(installed: (String) -> Bool) -> [AppEntry] {
+        let apps = defaultApps.filter { installed($0.bundleId) }
+        return apps.isEmpty ? [defaultApps[0]] : apps
+    }
+
+    static func visibleApps(_ apps: [AppEntry], installed: (String) -> Bool) -> [AppEntry] {
+        apps.filter { installed($0.bundleId) }
+    }
+
+    static func isInstalled(_ bundleId: String) -> Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) != nil
+    }
+
+    static var exists: Bool { FileManager.default.fileExists(atPath: fileURL.path) }
+
     static var fileURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config/\(Identity.configDirName)/config.json")
@@ -55,7 +70,7 @@ struct Config: Codable, Equatable {
             cached = (stamp, cfg)
             return cfg
         }
-        var cfg = Config(apps: defaultApps)
+        var cfg = Config(apps: installedDefaults(installed: isInstalled))
         if !FileManager.default.fileExists(atPath: fileURL.path) { cfg.launchAtLogin = false }
         if FileManager.default.fileExists(atPath: fileURL.path) {
             let backup = fileURL.deletingLastPathComponent().appendingPathComponent("config.unreadable.json")
@@ -116,13 +131,11 @@ struct AppInfo {
 
     @MainActor static func lookup(_ bundleId: String) -> AppInfo {
         if let hit = cache[bundleId] { return hit }
-        let info: AppInfo
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
-            info = AppInfo(url: url, name: name(of: url), icon: NSWorkspace.shared.icon(forFile: url.path))
-        } else {
-            info = AppInfo(url: nil, name: bundleId,
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
+            return AppInfo(url: nil, name: bundleId,
                            icon: NSImage(systemSymbolName: "questionmark.app.dashed", accessibilityDescription: nil) ?? NSImage())
         }
+        let info = AppInfo(url: url, name: name(of: url), icon: NSWorkspace.shared.icon(forFile: url.path))
         cache[bundleId] = info
         return info
     }
