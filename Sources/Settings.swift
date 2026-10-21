@@ -17,6 +17,10 @@ final class SettingsModel: ObservableObject {
     @Published var tab = CommandLine.arguments.first { $0.hasPrefix("--tab=") }.map { String($0.dropFirst(6)) } ?? "apps"
     let preview = PickerModel()
     var onChange: () -> Void = {}
+    var runSetup: () -> Void = {}
+    @Published var addOpen = false
+    @Published var addQuery = ""
+    @Published var installedApps: [FirstRun.App] = []
     private var saver: AnyCancellable?
 
     init() {
@@ -67,23 +71,73 @@ final class SettingsModel: ObservableObject {
 
     private var watcher: Timer?
 
+    var profileBrowsers: [String] {
+        Array(Set(cfg.apps.map(\.bundleId).filter { Profiles.kind(for: $0) != nil && AppInfo.lookup($0).installed })).sorted()
+    }
+
+    var profileState: FirstRun.ProfileState {
+        FirstRun.profileState(profileBrowsers: profileBrowsers, denied: profilesBlocked)
+    }
+
+    static func needsWatching(isDefault: Bool, profileState: FirstRun.ProfileState) -> Bool {
+        !isDefault || profileState == .needsAccess
+    }
+
     func stopWatching() {
         watcher?.invalidate()
         watcher = nil
     }
 
+    var isWatching: Bool { watcher != nil }
+
     func watchAccess() {
-        guard watcher == nil, profilesBlocked else { return }
-        watcher = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+        guard watcher == nil, Self.needsWatching(isDefault: isDefault, profileState: profileState) else { return }
+        let t = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.refresh()
-                if !self.profilesBlocked {
-                    self.watcher?.invalidate()
-                    self.watcher = nil
-                    self.onChange()
+                let wasBlocked = self.profilesBlocked
+                self.isDefault = DefaultBrowser.isDefault
+                if wasBlocked {
+                    self.profileBrowsers.forEach { _ = Profiles.list(for: $0) }
+                    self.profilesBlocked = Profiles.accessDenied
+                    if !self.profilesBlocked { self.refresh(); self.onChange() }
                 }
+                if !Self.needsWatching(isDefault: self.isDefault, profileState: self.profileState) { self.stopWatching() }
             }
+        }
+        t.tolerance = 0.5
+        RunLoop.main.add(t, forMode: .common)
+        watcher = t
+    }
+
+    var addCurated: [String] {
+        let listed = Set(cfg.apps.map(\.bundleId))
+        let me = Bundle.main.bundleIdentifier
+        let known = KnownApps.domains.keys
+            .filter { !$0.hasPrefix("com.apple.") && Config.isInstalled($0) }
+            .sorted { AppInfo.lookup($0).name.localizedCaseInsensitiveCompare(AppInfo.lookup($1).name) == .orderedAscending }
+        return known.filter { !listed.contains($0) && $0 != me }
+    }
+
+    var addBrowsers: [URL] {
+        let listed = Set(cfg.apps.map(\.bundleId))
+        return browsers.filter { url in
+            guard let id = Bundle(url: url)?.bundleIdentifier else { return false }
+            return !listed.contains(id) || Profiles.list(for: id).count > 1
+        }
+    }
+
+    var addResults: [FirstRun.App] {
+        FirstRun.search(addQuery, in: installedApps, excluding: [Bundle.main.bundleIdentifier ?? ""])
+    }
+
+    func openAdd() {
+        addQuery = ""
+        addOpen = true
+        guard installedApps.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            let apps = FirstRun.scanApps()
+            await MainActor.run { self.installedApps = apps }
         }
     }
 
@@ -225,13 +279,19 @@ struct SettingsView: View {
         Form {
             Section {
                 LabeledContent("Default browser") { DefaultBadge(m: m) }
+                LabeledContent {
+                    ProfilesBadge(m: m)
+                } label: {
+                    Text("Browser profiles")
+                    Text("Each Chrome or Firefox profile as its own choice.")
+                }
             }
+            .onAppear { m.watchAccess() }
+            .onDisappear { m.stopWatching() }
             Section {
                 Toggle("Show in menu bar", isOn: flag(\.showMenuBarIcon, true))
-                Toggle(isOn: flag(\.showInDock, false)) {
-                    Text("Show in Dock")
-                    Text("Off hides it from the Dock and ⌘-Tab.")
-                }
+                Toggle("Show in Dock", isOn: flag(\.showInDock, false))
+                    .help("Off hides it from the Dock and ⌘-Tab.")
                 Toggle("Open at login", isOn: flag(\.launchAtLogin, true))
             } footer: {
                 if !(m.cfg.showMenuBarIcon ?? true) && !(m.cfg.showInDock ?? false) {
@@ -251,8 +311,12 @@ struct SettingsView: View {
                     Text(m.historyCount == 1 ? "1 site" : "\(m.historyCount) sites")
                 }
                 .onAppear { m.historyCount = History.count }
-                LabeledContent("Quit \(Identity.appName)") {
-                    Button("Quit") { NSApp.terminate(nil) }
+                LabeledContent(Identity.appName) {
+                    HStack(spacing: 6) {
+                        Button("Run Setup Again") { m.runSetup() }
+                            .help("Open first-launch setup. Your current list is kept.")
+                        Button("Quit") { NSApp.terminate(nil) }
+                    }
                 }
             }
             UpdatesSection()
@@ -265,34 +329,106 @@ struct SettingsView: View {
     }
 
     private var addButton: some View {
-        Menu {
-            Section("Browsers") {
-                ForEach(m.browsers, id: \.self) { url in
-                    let id = Bundle(url: url)?.bundleIdentifier ?? ""
-                    let ps = Profiles.list(for: id)
-                    if ps.count > 1 {
-                        Menu(AppInfo.name(of: url)) {
-                            Button("Every Profile") { m.add(id) }
-                            Divider()
-                            ForEach(ps, id: \.id) { p in
-                                Button(p.name) { m.add(id, profile: p.id) }
-                            }
-                        }
-                    } else {
-                        Button(AppInfo.name(of: url)) { m.add(id) }
-                    }
-                }
-            }
-            Divider()
-            Button("Other App…") { m.chooseApp() }
+        Button {
+            m.openAdd()
         } label: {
             Label("Add App", systemImage: "plus.circle.fill")
         }
-        .menuStyle(.button)
         .buttonStyle(.borderless)
-        .menuIndicator(.hidden)
         .fixedSize()
         .frame(maxWidth: .infinity, alignment: .leading)
+        .popover(isPresented: $m.addOpen, arrowEdge: .bottom) {
+            AddAppPopover(m: m)
+        }
+    }
+}
+
+struct AddAppPopover: View {
+    @ObservedObject var m: SettingsModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search apps", text: $m.addQuery)
+                    .textFieldStyle(.plain)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    if m.addQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                        if !m.addBrowsers.isEmpty { header("Browsers") }
+                        ForEach(m.addBrowsers, id: \.self) { url in
+                            let id = Bundle(url: url)?.bundleIdentifier ?? ""
+                            browserRow(id, url: url)
+                        }
+                        if !m.addCurated.isEmpty {
+                            header("Apps")
+                            ForEach(m.addCurated, id: \.self) { id in row(id, name: AppInfo.lookup(id).name) }
+                        }
+                    } else if m.addResults.isEmpty {
+                        Text(m.installedApps.isEmpty ? "Looking for apps…" : "No app named “\(m.addQuery)”")
+                            .font(.callout).foregroundStyle(.secondary)
+                            .padding(.vertical, 8)
+                    } else {
+                        ForEach(m.addResults, id: \.id) { app in row(app.id, name: app.name) }
+                    }
+                }
+            }
+            .frame(height: 220)
+            Divider()
+            Button("Other App…") {
+                m.addOpen = false
+                m.chooseApp()
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(12)
+        .frame(width: 280)
+    }
+
+    private func header(_ text: String) -> some View {
+        Text(text).font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 4)
+    }
+
+    @ViewBuilder private func browserRow(_ id: String, url: URL) -> some View {
+        let ps = Profiles.list(for: id)
+        HStack(spacing: 8) {
+            Image(nsImage: AppInfo.lookup(id).icon).resizable().frame(width: 20, height: 20)
+            Text(AppInfo.name(of: url))
+            Spacer()
+            if ps.count > 1 {
+                Menu("Add") {
+                    Button("Every Profile") { add(id) }
+                    Divider()
+                    ForEach(ps, id: \.id) { p in Button(p.name) { add(id, profile: p.id) } }
+                }
+                .menuStyle(.button)
+                .fixedSize()
+            } else {
+                Button("Add") { add(id) }
+            }
+        }
+        .controlSize(.small)
+        .padding(.vertical, 2)
+    }
+
+    private func row(_ id: String, name: String) -> some View {
+        HStack(spacing: 8) {
+            Image(nsImage: AppInfo.lookup(id).icon).resizable().frame(width: 20, height: 20)
+            Text(name)
+            Spacer()
+            Button("Add") { add(id) }
+        }
+        .controlSize(.small)
+        .padding(.vertical, 2)
+    }
+
+    private func add(_ id: String, profile: String? = nil) {
+        m.add(id, profile: profile)
+        m.addQuery = ""
     }
 }
 
@@ -314,6 +450,23 @@ final class SettingsTabs: NSTabViewController {
     }
 }
 
+private struct ProfilesBadge: View {
+    @ObservedObject var m: SettingsModel
+
+    var body: some View {
+        switch m.profileState {
+        case .granted:
+            Label("Allowed", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        case .notNeeded:
+            Text("Not needed").foregroundStyle(.secondary)
+                .help("None of your apps use browser profiles.")
+        case .needsAccess:
+            Button("Open Full Disk Access") { Access.openFullDiskAccess() }
+                .help("Opens System Settings → Full Disk Access. Turn on \(Identity.appName).")
+        }
+    }
+}
+
 private struct DefaultBadge: View {
     @ObservedObject var m: SettingsModel
 
@@ -324,7 +477,7 @@ private struct DefaultBadge: View {
         } else {
             Button("Make Default") {
                 DefaultBrowser.make()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { m.refresh() }
+                m.watchAccess()
             }
             .buttonStyle(.glassProminent)
             .tint(.orange)
@@ -656,6 +809,17 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     init(onChange: @escaping () -> Void) {
         super.init()
         model.onChange = onChange
+    }
+
+    var runSetup: () -> Void {
+        get { model.runSetup }
+        set { model.runSetup = newValue }
+    }
+
+    func reload() {
+        guard window != nil else { return }
+        model.cfg = Config.load()
+        model.refresh()
     }
 
     var isVisible: Bool { window?.isVisible == true }

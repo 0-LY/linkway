@@ -7,7 +7,11 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
     private let model = PickerModel()
     private lazy var panel: PickerPanel = makePanel()
     private lazy var host = NSHostingView(rootView: PickerView(model: model))
-    private lazy var settings = SettingsWindow { [weak self] in self?.configChanged() }
+    private lazy var settings: SettingsWindow = {
+        let w = SettingsWindow { [weak self] in self?.configChanged() }
+        w.runSetup = { [weak self] in self?.setup.show() }
+        return w
+    }()
     private var statusItem: NSStatusItem?
     private var targets: [Target] = []
     private var stamp: Date?
@@ -20,7 +24,10 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
     private var configExisted = true
     private lazy var setup: SetupWindow = {
         let w = SetupWindow()
-        w.onFinish = { [weak self] in self?.configChanged() }
+        w.onFinish = { [weak self] in
+            self?.configChanged()
+            self?.settings.reload()
+        }
         return w
     }()
 

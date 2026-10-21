@@ -50,7 +50,9 @@ opens a small picker right where you are, and you choose where it opens.
    open links; search to add any other app), make Linkway your default browser, and optionally allow
    **Full Disk Access** to list browser profiles separately — the button opens that page in System Settings
    directly. A little confetti when you're done.
-   Run it again any time from the menu: **Set Up Linkway…**
+   Skipped it? Everything from setup is also in Settings: apps (with search under **Add App**) in the
+   Apps pane, default browser and browser profiles in General. Run it again with **Run Setup Again**
+   in Settings → General or **Set Up Linkway…** in the menu — your current list is kept.
    To start it with your Mac, turn on **Open at login** in Settings → General.
 
 <p align="center">

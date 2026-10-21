@@ -42,16 +42,12 @@ enum FirstRun {
         return out
     }
 
-    static func merge(chosen: [String], existing: [AppEntry], installed: (String) -> Bool) -> [AppEntry] {
-        var result: [AppEntry] = []
-        for id in chosen {
-            if let old = existing.first(where: { $0.bundleId == id }) {
-                result.append(old)
-            } else {
-                result.append(AppEntry(bundleId: id))
-            }
+    static func merge(chosen: [String], existing: [AppEntry]) -> [AppEntry] {
+        var result = existing
+        var have = Set(existing.map(\.bundleId))
+        for id in chosen where have.insert(id).inserted {
+            result.append(AppEntry(bundleId: id))
         }
-        result += existing.filter { !installed($0.bundleId) && !chosen.contains($0.bundleId) }
         return result
     }
 
@@ -115,6 +111,7 @@ final class SetupModel: ObservableObject {
         let icon: NSImage
         let browser: Bool
         var checked: Bool
+        var existing: Bool = false
     }
 
     enum Step: Int, CaseIterable { case welcome, apps, defaultBrowser, profiles }
@@ -139,7 +136,7 @@ final class SetupModel: ObservableObject {
     }
     var save: ([String]) -> Void = { chosen in
         var cfg = Config.load()
-        cfg.apps = FirstRun.merge(chosen: chosen, existing: cfg.apps, installed: Config.isInstalled)
+        cfg.apps = FirstRun.merge(chosen: chosen, existing: cfg.apps)
         Config.save(cfg)
     }
     private var timer: Timer?
@@ -170,7 +167,8 @@ final class SetupModel: ObservableObject {
         candidates = FirstRun.order(browsers: browsers, known: known, defaultBrowser: systemDefault, me: me).map { c in
             let info = AppInfo.lookup(c.id)
             return Candidate(id: c.id, name: info.name, icon: info.icon, browser: c.browser,
-                             checked: existing.isEmpty ? c.browser : existing.contains(c.id))
+                             checked: existing.isEmpty ? c.browser : existing.contains(c.id),
+                             existing: existing.contains(c.id))
         }
         isDefault = readDefault()
         step = 0
@@ -371,13 +369,15 @@ struct SetupView: View {
             VStack(spacing: 0) {
                 ForEach(Array(m.candidates.indices), id: \.self) { idx in
                     let c = m.candidates[idx]
-                    SetupAppRow(icon: c.icon, name: c.name, tag: c.browser ? "Browser" : nil) {
+                    SetupAppRow(icon: c.icon, name: c.name, tag: c.existing ? "In your list" : (c.browser ? "Browser" : nil)) {
                         Toggle("", isOn: $m.candidates[idx].checked)
                             .toggleStyle(.checkbox)
                             .labelsHidden()
+                            .disabled(c.existing)
                     }
                     .contentShape(Rectangle())
-                    .onTapGesture { m.candidates[idx].checked.toggle() }
+                    .onTapGesture { if !c.existing { m.candidates[idx].checked.toggle() } }
+                    .help(c.existing ? "Already in your list. Remove it in Settings → Apps." : "")
                     if idx < m.candidates.count - 1 { Divider().padding(.leading, 52) }
                 }
             }
