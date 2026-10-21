@@ -376,7 +376,10 @@ struct AddAppPopover: View {
                         ForEach(m.addResults, id: \.id) { app in row(app.id, name: app.name) }
                     }
                 }
+                .padding(.leading, 2)
+                .padding(.trailing, 16)
             }
+            .scrollIndicators(.automatic)
             .frame(height: 220)
             Divider()
             Button("Other App…") {
@@ -386,7 +389,7 @@ struct AddAppPopover: View {
             .buttonStyle(.borderless)
         }
         .padding(12)
-        .frame(width: 280)
+        .frame(width: 300)
     }
 
     private func header(_ text: String) -> some View {
