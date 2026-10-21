@@ -57,7 +57,9 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         Updates.shared.start()
         let args = CommandLine.arguments
         if args.contains("--make-default") { DefaultBrowser.make() }
-        model.onPick = { [weak self] i, bg in self?.open(index: i, background: bg) }
+        model.onPick = { [weak self] i, action in self?.open(index: i, action: action) }
+        GlobalHotKey.shared.onPress = { [weak self] in self?.openCopiedLink() }
+        if !DefaultBrowser.isDefault { DefaultBrowser.rememberPrevious() }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] note in
@@ -85,11 +87,53 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
     func application(_ application: NSApplication, open urls: [URL]) {
         gotURL = true
         let userWasHere = NSApp.isActive && Date().timeIntervalSince(activatedAt) > 1
-        cameFromElsewhere = !userWasHere
         let safe = urls.compactMap(Self.normalize)
         guard !safe.isEmpty else { return }
-        show(urls: safe)
+        if Config.modified != stamp { reload() }
+        guard Config.load().mode == .direct else {
+            present(safe, fromElsewhere: !userWasHere)
+            return
+        }
+        ModifierProbe.waitForOption { [weak self] held in
+            self?.route(safe, optionHeld: held, fromElsewhere: !userWasHere)
+        }
+    }
+
+    private func route(_ urls: [URL], optionHeld: Bool, fromElsewhere: Bool) {
+        let cfg = Config.load()
+        let list = targets
+        let decision = Router.decide(mode: cfg.mode, optionHeld: optionHeld, host: KnownApps.host(urls.first),
+                                     candidates: Router.candidates(list), matchApps: cfg.recommend ?? true,
+                                     remembered: Remembered.choice(for: urls.first), defaultId: cfg.defaultTarget,
+                                     previousDefault: cfg.previousDefaultBrowser)
+        guard case .open(let id, _) = decision, let t = list.first(where: { $0.id == id }) else {
+            present(urls, fromElsewhere: fromElsewhere)
+            return
+        }
+        History.record(urls.first, t.id)
+        Catalog.open(urls, with: t, background: false)
+        if Router.shouldShowToast(alreadyShown: cfg.directToastShown == true, route: decision) {
+            var c = cfg
+            c.directToastShown = true
+            Config.save(c)
+            Toast.shared.show(Router.toastText(appName: Identity.appName,
+                                               target: Router.targetName(title: t.title, subtitle: t.subtitle)))
+        }
+    }
+
+    private func present(_ urls: [URL], fromElsewhere: Bool) {
+        cameFromElsewhere = fromElsewhere
+        show(urls: urls)
         keepSettingsBehind()
+    }
+
+    private func openCopiedLink() {
+        guard let url = Router.clipboardURL(NSPasteboard.general.string(forType: .string)) else {
+            Toast.shared.show("No link on the clipboard")
+            return
+        }
+        let userWasHere = NSApp.isActive && Date().timeIntervalSince(activatedAt) > 1
+        present([url], fromElsewhere: !userWasHere)
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -126,8 +170,13 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         applyGeneral()
     }
 
+    private func applyShortcut(_ cfg: Config) {
+        GlobalHotKey.shared.register(cfg.copiedLinkShortcut.flatMap(RecordedShortcut.init(storageID:)))
+    }
+
     private func applyGeneral() {
         let cfg = Config.load()
+        applyShortcut(cfg)
         let svc = SMAppService.mainApp
         if cfg.launchAtLogin ?? true {
             if svc.status != .enabled { try? svc.register() }
@@ -255,10 +304,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         model.size = cfg.pickerSize ?? 0
         model.urls = urls
         model.targets = list
+        let remembered = Remembered.choice(for: urls.first).flatMap { id in list.firstIndex { $0.id == id } }
         let last = History.last(for: urls.first).flatMap { id in list.firstIndex { $0.id == id } }
         model.lastUsed = last
         model.recommended = recommended
-        model.selected = last ?? recommended ?? 0
+        model.remember = false
+        model.selected = remembered ?? last ?? recommended ?? 0
         model.origin = NSEvent.mouseLocation
         shownAt = Date()
         host.layoutSubtreeIfNeeded()
@@ -300,14 +351,19 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         panel.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
-    private func open(index: Int, background: Bool) {
+    private func open(index: Int, action: PickAction) {
         let shown = model.targets
         guard index >= 0, index < shown.count, !model.urls.isEmpty else { return }
         let urls = model.urls
         let t = shown[index]
-        hide(returnFocus: background)
+        hide(returnFocus: action.background)
         History.record(urls.first, t.id)
-        Catalog.open(urls, with: t, background: background)
+        if action.remember { Remembered.set(urls.first, t.id) }
+        Catalog.open(urls, with: t, background: action.background)
+    }
+
+    private func action(_ e: NSEvent) -> PickAction {
+        PickAction.from(e.modifierFlags, rememberChecked: model.remember)
     }
 
     private func move(_ delta: Int) {
@@ -317,8 +373,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
 
     private func handleKey(_ e: NSEvent) -> Bool {
         if e.keyCode != 53, Date().timeIntervalSince(shownAt) < 0.3 { return true }
-        let chars = (e.charactersIgnoringModifiers ?? "").lowercased()
+        let chars = (e.characters(byApplyingModifiers: []) ?? e.charactersIgnoringModifiers ?? "").lowercased()
         let shift = e.modifierFlags.contains(.shift)
+        if e.modifierFlags.contains(.command), e.keyCode == 36 || e.keyCode == 76 {
+            open(index: model.selected, action: action(e))
+            return true
+        }
         if e.modifierFlags.contains(.command) {
             switch chars {
             case "c":
@@ -338,7 +398,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         let cols = model.columns
         switch e.keyCode {
         case 53: hide()
-        case 36, 76: open(index: model.selected, background: shift)
+        case 36, 76: open(index: model.selected, action: action(e))
         case 123: move(-1)
         case 124: move(1)
         case 126: move(-cols)
@@ -346,9 +406,11 @@ final class Controller: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMen
         case 48: move(shift ? -1 : 1)
         default:
             if let d = Int(chars), (1...9).contains(d) {
-                open(index: d - 1, background: shift)
+                open(index: d - 1, action: action(e))
             } else if let i = model.targets.firstIndex(where: { !$0.key.isEmpty && $0.key == chars }) {
-                open(index: i, background: shift)
+                open(index: i, action: action(e))
+            } else if chars == "r" {
+                model.remember.toggle()
             } else {
                 return false
             }

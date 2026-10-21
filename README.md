@@ -21,16 +21,26 @@
 ## What it does
 
 Set Linkway as your default browser. Every link you click — in mail, chat, documents or the terminal —
-opens a small picker right where you are, and you choose where it opens.
+opens straight away in the right app, with no extra step:
 
-- Pick with a click, the arrow keys and ↩, the numbers 1–9, or each app's letter.
-  ⇧ opens in the background, ⌘C copies the link, esc cancels.
-- Recommends the app a link belongs to — a Figma link selects Figma — but only from apps in your list.
-- Remembers the app you used last for each site and selects it next time.
+| You click a link… | It opens in |
+|---|---|
+| that belongs to an app in your list (linear.app, figma.com…) | that app |
+| for a site you told Linkway to remember | the app you chose for it |
+| anywhere else | your default browser or app (for example Chrome) |
+| while holding **⌥ Option** | the picker, so you choose |
+
+- In the picker: click, the arrow keys and ↩, the numbers 1–9, or each app's letter.
+  **⇧↩** (or "Remember for this site") opens it and remembers the choice for that site.
+  ⌘↩ opens in the background, ⌘C copies the link, esc cancels.
+- Prefer choosing every time? Settings → Links → **When I click a link: Always ask**.
+- Optional shortcut **Open copied link** shows the picker for the link on your clipboard.
 - Chrome-family and Firefox profiles show up as separate choices.
 - Add, remove, reorder, rename and hide apps, set shortcut letters, picker size and position.
+- Apps that ask "Open in Linkway" mean your default browser — Linkway passes the link on.
 
 <p align="center">
+  <img src="docs/screenshots/settings-links.png" width="360" alt="Links settings">
   <img src="docs/screenshots/settings-apps.png" width="360" alt="Apps settings">
   <img src="docs/screenshots/settings-picker.png" width="360" alt="Picker settings">
   <img src="docs/screenshots/settings-general.png" width="360" alt="General settings">
@@ -47,17 +57,19 @@ opens a small picker right where you are, and you choose where it opens.
 2. Drag **Linkway** onto the **Applications** folder in the window that opens.
 3. Open Linkway from Applications and use **Open Anyway** as above.
 4. **First launch:** a short setup welcomes you, lets you pick your apps (your browsers and apps that
-   open links; search to add any other app), make Linkway your default browser, and optionally allow
+   open links; search to add any other app), choose where all other links open, make Linkway your
+   default browser, and optionally allow
    **Full Disk Access** to list browser profiles separately — the button opens that page in System Settings
    directly. A little confetti when you're done.
    Skipped it? Everything from setup is also in Settings: apps (with search under **Add App**) in the
-   Apps pane, default browser and browser profiles in General. Run it again with **Run Setup Again**
+   Apps pane, where other links open in Links, default browser and browser profiles in General. Run it again with **Run Setup Again**
    in Settings → General or **Set Up Linkway…** in the menu — your current list is kept.
    To start it with your Mac, turn on **Open at login** in Settings → General.
 
 <p align="center">
   <img src="docs/screenshots/setup-welcome.png" width="200" alt="Setup: welcome">
   <img src="docs/screenshots/setup-apps.png" width="200" alt="Setup: choose your apps">
+  <img src="docs/screenshots/setup-other.png" width="200" alt="Setup: where other links open">
   <img src="docs/screenshots/setup-default.png" width="200" alt="Setup: default browser">
   <img src="docs/screenshots/setup-profiles.png" width="200" alt="Setup: browser profiles">
 </p>
@@ -69,7 +81,8 @@ Requirements: macOS 26 or later on Apple silicon.
 - Linkway makes no network connections of its own, apart from checking for updates.
 - No account, no analytics, no tracking.
 - It only opens normal `http` and `https` links; anything else is ignored.
-- Per-site history stores only the site name (for example `example.com`) and the app you picked — never full links.
+- Per-site history and remembered sites store only the site name (for example `example.com`) and the app you
+  picked — never full links. Manage or clear them in Settings → Links.
 - Settings and history live in `~/.config/linkway/`, readable only by you.
 - With Full Disk Access, Linkway reads only Chrome's and Firefox's profile lists — never cookies, history or passwords.
 - Update checks fetch `https://github.com/0-LY/linkway/releases/latest/download/appcast.xml`. No system profile is sent.
@@ -97,6 +110,8 @@ You need the Xcode Command Line Tools (`xcode-select --install`). The first buil
 |---|---|
 | `Sources/main.swift` | App, link handling, picker window |
 | `Sources/Picker.swift` | The picker |
+| `Sources/Routing.swift` | Where a link opens: app match, remembered site, default, or the picker |
+| `Sources/Toast.swift` | The one-time "opened in…" note |
 | `Sources/Catalog.swift` | Apps, profiles, recommendations, history |
 | `Sources/Settings.swift` | Settings window |
 | `Sources/Updates.swift` | Automatic updates (Sparkle) |

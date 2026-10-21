@@ -42,6 +42,27 @@ enum FirstRun {
         return out
     }
 
+    static func applyOther(_ other: String?, previous: String?, to cfg: inout Config) {
+        if other == SetupModel.askEachTime {
+            cfg.linkMode = .ask
+        } else {
+            if let other, cfg.defaultTarget?.hasPrefix(other + "|") != true { cfg.defaultTarget = other + "|" }
+            cfg.linkMode = .direct
+        }
+        if let previous { cfg.previousDefaultBrowser = previous }
+    }
+
+    static func otherChoices(checked: [(id: String, browser: Bool)]) -> [String] {
+        let browsers = checked.filter(\.browser).map(\.id)
+        return browsers.isEmpty ? checked.map(\.id) : browsers
+    }
+
+    static func preferredOther(choices: [String], previous: String?, current: String?) -> String? {
+        if let current, choices.contains(current) { return current }
+        if let previous, choices.contains(previous) { return previous }
+        return choices.first
+    }
+
     static func merge(chosen: [String], existing: [AppEntry]) -> [AppEntry] {
         var result = existing
         var have = Set(existing.map(\.bundleId))
@@ -114,7 +135,7 @@ final class SetupModel: ObservableObject {
         var existing: Bool = false
     }
 
-    enum Step: Int, CaseIterable { case welcome, apps, defaultBrowser, profiles }
+    enum Step: Int, CaseIterable { case welcome, apps, other, defaultBrowser, profiles }
 
     @Published var step = 0
     @Published var candidates: [Candidate] = []
@@ -125,6 +146,8 @@ final class SetupModel: ObservableObject {
     @Published var forward = true
     @Published var celebrating = false
     @Published var frames = SetupFrames()
+    @Published var other: String?
+    var previousDefault: String?
     let preview = PickerModel()
     var onFinish: () -> Void = {}
     var makeDefault: () -> Void = { DefaultBrowser.make() }
@@ -134,10 +157,24 @@ final class SetupModel: ObservableObject {
         ids.forEach { _ = Profiles.list(for: $0) }
         return Profiles.accessDenied
     }
-    var save: ([String]) -> Void = { chosen in
+    var save: ([String], String?, String?) -> Void = { chosen, other, previous in
         var cfg = Config.load()
         cfg.apps = FirstRun.merge(chosen: chosen, existing: cfg.apps)
+        FirstRun.applyOther(other, previous: previous, to: &cfg)
         Config.save(cfg)
+    }
+
+    var otherChoices: [Candidate] {
+        let ids = FirstRun.otherChoices(checked: candidates.filter(\.checked).map { ($0.id, $0.browser) })
+        return ids.compactMap { id in candidates.first { $0.id == id } }
+    }
+
+    nonisolated static let askEachTime = "__ask__"
+
+    func syncOther() {
+        let ids = otherChoices.map(\.id)
+        if let o = other, o == Self.askEachTime || ids.contains(o) { return }
+        other = FirstRun.preferredOther(choices: ids, previous: previousDefault, current: nil)
     }
     private var timer: Timer?
 
@@ -160,6 +197,10 @@ final class SetupModel: ObservableObject {
         let browsers = FirstRun.realBrowsers(handlers)
             .sorted { AppInfo.lookup($0).name.localizedCaseInsensitiveCompare(AppInfo.lookup($1).name) == .orderedAscending }
         let systemDefault = NSWorkspace.shared.urlForApplication(toOpen: probe).flatMap { Bundle(url: $0)?.bundleIdentifier }
+        let stored = Config.exists ? Config.load() : nil
+        previousDefault = systemDefault.flatMap { $0 != me && FirstRun.isBrowser($0) ? $0 : nil }
+            ?? stored?.previousDefaultBrowser
+        let storedOther = stored?.defaultTarget.map { String($0.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).first ?? "") }
         let known = KnownApps.domains.keys
             .filter { !$0.hasPrefix("com.apple.") && Config.isInstalled($0) }
             .sorted { AppInfo.lookup($0).name.localizedCaseInsensitiveCompare(AppInfo.lookup($1).name) == .orderedAscending }
@@ -171,6 +212,8 @@ final class SetupModel: ObservableObject {
                              existing: existing.contains(c.id))
         }
         isDefault = readDefault()
+        other = Config.load().linkMode == .ask && Config.exists ? Self.askEachTime
+            : FirstRun.preferredOther(choices: otherChoices.map(\.id), previous: previousDefault, current: storedOther)
         step = 0
         query = ""
         forward = true
@@ -242,11 +285,15 @@ final class SetupModel: ObservableObject {
         let name = Identity.appName
         switch Step(rawValue: s) ?? .welcome {
         case .welcome:
-            return SetupPage(title: "Welcome to \(name)", subtitle: "Every link you click, opened in the app you choose.",
+            return SetupPage(title: "Welcome to \(name)", subtitle: "Every link opens in the right app. Hold ⌥ to choose.",
                              primary: "Get Started")
         case .apps:
             return SetupPage(title: "Choose your apps", subtitle: "Links open in the apps you pick. Search to add any other app.",
                              primary: "Continue", primaryEnabled: candidates.contains { $0.checked }, back: true)
+        case .other:
+            return SetupPage(title: "Where should other links open?",
+                             subtitle: "Links for Linear, Figma and other apps open there. Everything else opens here.",
+                             primary: "Continue", primaryEnabled: other != nil, back: true)
         case .defaultBrowser:
             return SetupPage(title: "Make \(name) your default browser",
                              subtitle: "Every link you click comes here first, so you choose where it opens.",
@@ -277,12 +324,13 @@ final class SetupModel: ObservableObject {
     func go(_ delta: Int) {
         forward = delta > 0
         step = max(0, min(Self.count - 1, step + delta))
+        if current == .other { syncOther() }
         stepChanged()
     }
 
     func finish() {
         stopWatching()
-        save(candidates.filter(\.checked).map(\.id))
+        save(candidates.filter(\.checked).map(\.id), other, previousDefault)
         celebrating = true
         onFinish()
     }
@@ -301,6 +349,7 @@ struct SetupView: View {
             switch SetupModel.Step(rawValue: s) ?? .welcome {
             case .welcome: welcomeContent
             case .apps: appsContent
+            case .other: otherContent
             case .defaultBrowser: defaultContent
             case .profiles: profilesContent
             }
@@ -335,7 +384,7 @@ struct SetupView: View {
             }
             .frame(height: 176)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            Text("Click a link anywhere, then pick where it opens.")
+            Text("Hold ⌥ while you click a link to pick where it opens.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
@@ -415,6 +464,36 @@ struct SetupView: View {
                 .mask(SetupFade(enabled: hits.count > 4))
             }
         }
+    }
+
+    private var otherContent: some View {
+        SetupBox {
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(m.otherChoices.enumerated()), id: \.element.id) { i, c in
+                        SetupAppRow(icon: c.icon, name: c.name, tag: nil) {
+                            Image(systemName: m.other == c.id ? "largecircle.fill.circle" : "circle")
+                                .font(.system(size: 15))
+                                .foregroundStyle(m.other == c.id ? Color(nsColor: .controlAccentColor) : .secondary)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { m.other = c.id }
+                        Divider().padding(.leading, 52)
+                    }
+                    SetupAppRow(icon: NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: nil) ?? NSImage(),
+                                name: "Ask each time", tag: "picker opens for every link") {
+                        Image(systemName: m.other == SetupModel.askEachTime ? "largecircle.fill.circle" : "circle")
+                            .font(.system(size: 15))
+                            .foregroundStyle(m.other == SetupModel.askEachTime ? Color(nsColor: .controlAccentColor) : .secondary)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { m.other = SetupModel.askEachTime }
+                }
+                .padding(.vertical, 4)
+            }
+            .mask(SetupFade(enabled: m.otherChoices.count + 1 > 4))
+        }
+        .frame(height: SetupLayout.contentHeight - 40)
     }
 
     private var defaultContent: some View {

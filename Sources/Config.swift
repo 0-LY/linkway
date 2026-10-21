@@ -26,6 +26,20 @@ struct Config: Codable, Equatable {
     var recommend: Bool?
     var pickerSize: Int?
     var hideProfilesNotice: Bool?
+    var linkMode: LinkMode?
+    var defaultTarget: String?
+    var previousDefaultBrowser: String?
+    var directToastShown: Bool?
+    var copiedLinkShortcut: String?
+
+    var mode: LinkMode { linkMode ?? .direct }
+
+    static func migrated(_ cfg: Config) -> (Config, changed: Bool) {
+        var c = cfg
+        var changed = false
+        if c.linkMode == nil { c.linkMode = .direct; changed = true }
+        return (c, changed)
+    }
 
     static let defaultApps: [AppEntry] = [
         .init(bundleId: "com.apple.Safari", key: "s"),
@@ -63,14 +77,21 @@ struct Config: Codable, Equatable {
         let stamp = modified
         if let c = cached, stamp != nil, c.stamp == stamp { return c.cfg }
         if let data = try? Data(contentsOf: fileURL),
-           let cfg = try? JSONDecoder().decode(Config.self, from: data) {
+           let decoded = try? JSONDecoder().decode(Config.self, from: data) {
             lockDirectory()
             protect(fileURL)
             protect(fileURL.deletingLastPathComponent().appendingPathComponent("history.json"))
-            cached = (stamp, cfg)
+            protect(fileURL.deletingLastPathComponent().appendingPathComponent("remembered.json"))
+            let (cfg, changed) = migrated(decoded)
+            if changed {
+                save(cfg)
+            } else {
+                cached = (stamp, cfg)
+            }
             return cfg
         }
         var cfg = Config(apps: installedDefaults(installed: isInstalled))
+        cfg.linkMode = .direct
         if !FileManager.default.fileExists(atPath: fileURL.path) { cfg.launchAtLogin = false }
         if FileManager.default.fileExists(atPath: fileURL.path) {
             let backup = fileURL.deletingLastPathComponent().appendingPathComponent("config.unreadable.json")
@@ -111,7 +132,21 @@ enum DefaultBrowser {
         return u.standardizedFileURL.path == Bundle.main.bundleURL.standardizedFileURL.path
     }
 
+    static func current() -> String? {
+        NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!)
+            .flatMap { Bundle(url: $0)?.bundleIdentifier }
+    }
+
+    static func rememberPrevious(_ id: String? = current()) {
+        guard let id, id != Bundle.main.bundleIdentifier, FirstRun.isBrowser(id) else { return }
+        var cfg = Config.load()
+        guard cfg.previousDefaultBrowser != id else { return }
+        cfg.previousDefaultBrowser = id
+        Config.save(cfg)
+    }
+
     static func make() {
+        rememberPrevious()
         let me = Bundle.main.bundleURL
         NSWorkspace.shared.setDefaultApplication(at: me, toOpenURLsWithScheme: "http") { _ in
             NSWorkspace.shared.setDefaultApplication(at: me, toOpenURLsWithScheme: "https") { _ in }

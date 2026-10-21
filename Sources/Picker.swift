@@ -45,8 +45,9 @@ final class PickerModel: ObservableObject {
     @Published var lastUsed: Int?
     @Published var recommended: Int?
     @Published var size = 0
+    @Published var remember = false
     var origin: NSPoint = .zero
-    var onPick: (Int, Bool) -> Void = { _, _ in }
+    var onPick: (Int, PickAction) -> Void = { _, _ in }
 
     var columns: Int { max(1, min(targets.count, 8)) }
 
@@ -80,7 +81,7 @@ struct PickerView: View {
                     Tile(target: t, index: i, mt: mt, selected: i == model.selected,
                          lastUsed: i == model.lastUsed, recommended: i == model.recommended)
                         .onHover { if $0 { model.hover(i) } }
-                        .onTapGesture { model.onPick(i, NSEvent.modifierFlags.contains(.shift)) }
+                        .onTapGesture { model.onPick(i, PickAction.from(NSEvent.modifierFlags, rememberChecked: model.remember)) }
                 }
             }
             hint
@@ -124,6 +125,19 @@ struct PickerView: View {
             if model.current != nil {
                 KeyCap("↩", size: mt.small - 1)
                 Text("Open")
+                Spacer().frame(width: mt.pad)
+                Button {
+                    model.remember.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: model.remember ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(model.remember ? Color(nsColor: .controlAccentColor) : .primary.opacity(0.6))
+                        Text("Remember for this site")
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Open it there automatically next time · ⇧↩ or R")
             }
         }
         .font(.system(size: mt.small, weight: .medium))

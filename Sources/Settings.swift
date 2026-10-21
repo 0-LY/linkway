@@ -10,6 +10,10 @@ final class SettingsModel: ObservableObject {
     @Published var editing: UUID?
     @Published var dropTarget: UUID?
     @Published var historyCount = 0
+    @Published var rememberedCount = 0
+    @Published var remembered: [(host: String, target: String)] = []
+    @Published var showManage = false
+    @Published var targets: [Target] = []
     var dragging: UUID?
     @Published var isDefault = false
     @Published var profilesBlocked = false
@@ -34,8 +38,42 @@ final class SettingsModel: ObservableObject {
         }
     }
 
+    var effectiveDefault: String? {
+        Router.fallback(defaultId: cfg.defaultTarget, previousDefault: cfg.previousDefaultBrowser,
+                        in: Router.candidates(targets))
+    }
+
+    func targetName(_ id: String) -> String {
+        if let t = targets.first(where: { $0.id == id }) { return Router.targetName(title: t.title, subtitle: t.subtitle) }
+        let bundle = String(id.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).first ?? "")
+        return AppInfo.lookup(bundle).name
+    }
+
+    func reloadRemembered() {
+        remembered = Remembered.all
+        rememberedCount = remembered.count
+        historyCount = History.count
+    }
+
+    func forget(_ host: String) {
+        Remembered.remove(host)
+        reloadRemembered()
+    }
+
+    func clearRemembered() {
+        Remembered.clear()
+        History.clear()
+        reloadRemembered()
+    }
+
+    var shortcut: Binding<RecordedShortcut?> {
+        Binding(get: { self.cfg.copiedLinkShortcut.flatMap(RecordedShortcut.init(storageID:)) },
+                set: { self.cfg.copiedLinkShortcut = $0?.storageID })
+    }
+
     func updatePreview() {
         let t = Catalog.build(cfg)
+        targets = t
         var host = "example.com"
         var path = "/an/article"
         if let d = t.lazy.compactMap({ $0.domains.first }).first {
@@ -61,6 +99,7 @@ final class SettingsModel: ObservableObject {
         isDefault = DefaultBrowser.isDefault
         profilesBlocked = Profiles.accessDenied
         updatePreview()
+        reloadRemembered()
     }
 
     func save() {
@@ -211,6 +250,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             Group {
                 switch tab {
+                case "links": linksTab
                 case "picker": pickerTab
                 case "general": generalTab
                 default: appsTab
@@ -223,6 +263,82 @@ struct SettingsView: View {
         }
         .controlSize(.small)
         .frame(width: 480, height: 580)
+        .coordinateSpace(name: "probe")
+    }
+
+    private var modeBinding: Binding<LinkMode> {
+        Binding(get: { m.cfg.mode }, set: { v in withAnimation(.easeInOut(duration: 0.25)) { m.cfg.linkMode = v } })
+    }
+
+    private var matchBinding: Binding<Bool> {
+        Binding(get: { m.cfg.recommend ?? true }, set: { v in withAnimation(.easeInOut(duration: 0.25)) { m.cfg.recommend = v } })
+    }
+
+    private var defaultBinding: Binding<String> {
+        Binding(get: { m.effectiveDefault ?? "" }, set: { m.cfg.defaultTarget = $0 })
+    }
+
+    private var linksTab: some View {
+        Form {
+            Section {
+                Picker("When I click a link", selection: modeBinding) {
+                    Text("Open directly").tag(LinkMode.direct)
+                    Text("Always ask").tag(LinkMode.ask)
+                }
+                .pickerStyle(.segmented)
+                .probe("mode")
+                if m.cfg.mode == .direct {
+                    Picker("Open everything else in", selection: defaultBinding) {
+                        ForEach(m.targets, id: \.id) { t in
+                            Text(Router.targetName(title: t.title, subtitle: t.subtitle)).tag(t.id)
+                        }
+                    }
+                    .probe("default")
+                    .transition(.opacity)
+                }
+            } footer: {
+                Text(m.cfg.mode == .direct
+                     ? "Hold ⌥ while you click a link to choose where it opens."
+                     : "The picker opens for every link you click.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Toggle(isOn: matchBinding) {
+                    Text("Open links in their apps")
+                    if m.cfg.recommend ?? true {
+                        Text("linear.app → Linear, figma.com → Figma")
+                    }
+                }
+                .probe("match")
+                LabeledContent {
+                    HStack(spacing: 6) {
+                        Button("Manage…") { m.reloadRemembered(); m.showManage = true }
+                            .disabled(m.rememberedCount == 0)
+                        Button("Clear") { m.clearRemembered() }
+                            .disabled(m.rememberedCount == 0 && m.historyCount == 0)
+                    }
+                } label: {
+                    Text("Remembered sites")
+                    Text(m.rememberedCount == 1 ? "1 site opens automatically" : "\(m.rememberedCount) sites open automatically")
+                }
+                .probe("remembered")
+                .onAppear { m.reloadRemembered() }
+            } footer: {
+                Text("In the picker, ⇧↩ or “Remember for this site” saves your choice.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                LabeledContent {
+                    ShortcutRecorder(shortcut: m.shortcut)
+                } label: {
+                    Text("Open copied link")
+                    Text("Shows the picker for the link on the clipboard.")
+                }
+                .probe("shortcut")
+            }
+        }
+        .formStyle(.grouped)
+        .sheet(isPresented: $m.showManage) { ManageSitesSheet(m: m) }
     }
 
     private var appsTab: some View {
@@ -263,12 +379,8 @@ struct SettingsView: View {
                     Text("Screen center").tag(true)
                 }
                 .pickerStyle(.segmented)
-                Toggle(isOn: Binding(get: { m.cfg.recommend ?? true }, set: { m.cfg.recommend = $0 })) {
-                    Text("Recommend the matching app")
-                    Text("linear.app → Linear, figma.com → Figma")
-                }
             } footer: {
-                Text("⇧ background · ⌘C copy link · esc cancel")
+                Text("⇧ remember · ⌘ background · ⌘C copy link · esc cancel")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -300,17 +412,6 @@ struct SettingsView: View {
                 }
             }
             Section {
-                LabeledContent {
-                    Button("Clear") {
-                        History.clear()
-                        m.historyCount = 0
-                    }
-                    .disabled(m.historyCount == 0)
-                } label: {
-                    Text("Remembered sites")
-                    Text(m.historyCount == 1 ? "1 site" : "\(m.historyCount) sites")
-                }
-                .onAppear { m.historyCount = History.count }
                 LabeledContent(Identity.appName) {
                     HStack(spacing: 6) {
                         Button("Run Setup Again") { m.runSetup() }
@@ -444,12 +545,52 @@ var appVersion: String {
 
 final class SettingsTabs: NSTabViewController {
     static let lastKey = "settingsPane"
-    static let panes = [("apps", "Apps", "square.grid.2x2"), ("picker", "Picker", "cursorarrow.rays"),
-                        ("general", "General", "gearshape")]
+    static let panes = [("apps", "Apps", "square.grid.2x2"), ("links", "Links", "link"),
+                        ("picker", "Picker", "cursorarrow.rays"), ("general", "General", "gearshape")]
 
     override func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
         super.tabView(tabView, didSelect: tabViewItem)
         if let id = tabViewItem?.identifier as? String { UserDefaults.standard.set(id, forKey: Self.lastKey) }
+    }
+}
+
+struct ManageSitesSheet: View {
+    @ObservedObject var m: SettingsModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Remembered sites").font(.headline)
+            Text("These sites open in the app you chose, without the picker.")
+                .font(.caption).foregroundStyle(.secondary)
+            List {
+                ForEach(m.remembered, id: \.host) { item in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.host)
+                            Text(m.targetName(item.target)).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            m.forget(item.host)
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Forget \(item.host)")
+                    }
+                }
+            }
+            .frame(height: 220)
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(16)
+        .frame(width: 380)
+        .onChange(of: m.rememberedCount) { _, n in if n == 0 { dismiss() } }
     }
 }
 

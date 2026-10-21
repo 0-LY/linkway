@@ -209,6 +209,64 @@ enum History {
 }
 
 @MainActor
+enum Remembered {
+    nonisolated(unsafe) static var directory: URL?
+
+    private static var url: URL {
+        (directory ?? Config.fileURL.deletingLastPathComponent()).appendingPathComponent("remembered.json")
+    }
+
+    private static var cache: [String: String]?
+
+    private static var store: [String: String] {
+        get {
+            if let c = cache { return c }
+            let d = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode([String: String].self, from: $0) } ?? [:]
+            Config.protect(url)
+            cache = d
+            return d
+        }
+        set {
+            cache = newValue
+            if directory == nil { Config.lockDirectory() }
+            let enc = JSONEncoder()
+            enc.outputFormatting = [.sortedKeys]
+            if newValue.isEmpty {
+                try? FileManager.default.removeItem(at: url)
+            } else if let d = try? enc.encode(newValue) {
+                try? d.write(to: url, options: .atomic)
+            }
+            Config.protect(url)
+        }
+    }
+
+    static func reset() { cache = nil }
+
+    static func choice(for url: URL?) -> String? {
+        History.key(url).flatMap { store[$0] }
+    }
+
+    static func set(_ url: URL?, _ targetId: String) {
+        guard let k = History.key(url) else { return }
+        store[k] = targetId
+    }
+
+    static func remove(_ host: String) {
+        store[host] = nil
+    }
+
+    static var all: [(host: String, target: String)] {
+        store.map { ($0.key, $0.value) }.sorted { $0.host < $1.host }
+    }
+
+    static var count: Int { store.count }
+
+    static func clear() {
+        store = [:]
+    }
+}
+
+@MainActor
 enum Catalog {
     static func build(_ cfg: Config) -> [Target] {
         var out: [Target] = []
