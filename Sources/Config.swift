@@ -92,7 +92,6 @@ struct Config: Codable, Equatable {
         }
         var cfg = Config(apps: installedDefaults(installed: isInstalled))
         cfg.linkMode = .direct
-        if !FileManager.default.fileExists(atPath: fileURL.path) { cfg.launchAtLogin = false }
         if FileManager.default.fileExists(atPath: fileURL.path) {
             let backup = fileURL.deletingLastPathComponent().appendingPathComponent("config.unreadable.json")
             if !FileManager.default.fileExists(atPath: backup.path) {
